@@ -28,6 +28,7 @@ def getext(file):
     if magic == "Matroska data": return "mkv"
     return "mpg"
 
+
 def fixname(name):
     return name.replace("\\","_").replace("#","_").replace("!","_").replace("/","-")
 
@@ -62,25 +63,46 @@ def downloadwget(src, dst):
     #remove(tmp)
     return True
 
+
 def downloadday9(pool):
     global vf
     doc = libxml2.parseDoc(urlopen("http://day9tv.blip.tv/rss").read())
     ctxt = doc.xpathNewContext()
     
-    files = set([ x.rsplit(".",1)[0] for x in listdir("day9")])
-    
-    for x in ctxt.xpathEval("//item"):
+    files = set([ x.rsplit(".",1)[0] for x in listdir("day9_daily")])
+    files2 = set([ x.rsplit(".",1)[0] for x in listdir("day9")])
+    o=""
+    n=0
+    for x in reversed(ctxt.xpathEval("//item")):
         url = x.xpathEval("enclosure/@url")
         title = x.xpathEval("title")
         if url and title:
             t = fixname(title[0].getContent().replace("D9D ","").replace("Day[9] Daily #","").replace("-"," ",1))
             t = t.split(" ",1)
-        t = "%03d - %s"%(int(t[0]),t[1].strip())
-        if not t in files:
-            src = url[0].getContent()
-            vf.append( (user, t) )
-            pool.apply_async(downloadwget, (src,"day9/"+t))
-            #downloadwget(src,t)
+        daily=False
+        try:
+            t = "%03d - %s"%(int(t[0]),t[1].strip())
+            daily=True
+        except:
+            pass
+        
+        if daily:
+            if not t in files:
+                src = url[0].getContent()
+                vf.append( ("day9", t) )
+                pool.apply_async(downloadwget, (src,"day9_daily/"+t))
+        else:
+            pass
+            # t = title[0].getContent()
+            # x = t.split(" Game")[0].split("(")[0].strip(" 0123456789-")
+            # if x != o:
+            #     n+=1
+            #     o=x
+            # t = "%04d %s"%(n,t) 
+            # if not t in files2:
+            #     src = url[0].getContent()
+            #     vf.append( ("day9", t) )
+            #     pool.apply_async(downloadwget, (src,"day9/"+t))
     
 def downloadyoutubeuser(pool, user):
     global vf
@@ -116,7 +138,7 @@ def downloadyoutubeuser(pool, user):
     i=0
     while i < len(videos) or (i+video) in numtoname:
         v = (i+video)
-        if v in numtoname and numtoname[v] == videos[i][1]: 
+        if v in numtoname and i < len(videos) and numtoname[v] == videos[i][1]: 
             i += 1
             continue
 
@@ -126,4 +148,28 @@ def downloadyoutubeuser(pool, user):
         if i < len(videos): 
             vf.append( (user, "%04d - %s"%(v,videos[i][1])) )
             pool.apply_async(youtubedownload, (videos[i][0],"%s/%04d - %s"%(user,v,videos[i][1])))
-            #youtubedownload(videos[i][0],"%s/%04d - %s"%(use
+            #youtubedownload(videos[i][0],"%s/%04d - %s"%(user,v,videos[i][1]))
+        i += 1
+
+if __name__ == '__main__':
+    vf=[]
+    pool = Pool(processes=6)
+    downloadday9(pool)
+    #users=['HuskyStarcraft','grethsc','HDstarcraft', 'moletrap', 'VioleTak', 'diggitySC' ]
+    #for user in users:
+    #    downloadyoutubeuser(pool, user)
+
+    pool.close()
+    pool.join()
+
+    if vf:
+        msg = MIMEMultipart()
+        msg['Subject'] = "Podder"
+        msg['From'] = from_addr
+        msg['To'] = to_addr
+        m = "Videos where fetched by podder\n\n"+"\n".join([ ": ".join(x) for x in vf])+"\n"
+        msg.attach(MIMEText(m))
+        smtp = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        smtp.login(gmail_user, gmail_pass)
+        smtp.sendmail(from_addr, to_addr, msg.as_string())
+
