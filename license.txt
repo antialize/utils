@@ -1,0 +1,8 @@
+The code in the utils project is distributed under any none empty subset of the following terms (your choice):
+* Apache License, 2.0
+* New BSD license
+* GNU General Public License (GPL version 2)
+* GNU Library or "Lesser" General Public License (LGPL version 2)
+* MIT license
+* Mozilla Public License 1.1 (MPL)
+* Public domain
